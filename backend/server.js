@@ -1,58 +1,34 @@
-
-const express = require("express");
+require("dotenv").config();
 const mongoose = require("mongoose");
-const cors = require("cors");
-const dotenv = require("dotenv");
 
-dotenv.config();
-
-const app = express();
-
-// Middleware - only once
-app.use(cors());
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: true }));
-
-// Routes - only once
-app.use("/api/auth", require("./routes/authRoutes"));
-app.use("/api/students", require("./routes/studentRoutes"));
-app.use("/api/attendance", require("./routes/attendanceRoutes"));
-app.use("/api/fees", require("./routes/feesRoutes"));
-
-// Health check
-app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Tuition Management System API is running",
-    database:
-      mongoose.connection.readyState === 1
-        ? "Connected"
-        : "Disconnected"
-  });
-});
-
-// Handle unknown routes
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "API route not found"
-  });
-});
-
-const PORT = process.env.PORT || 5000;
+const { validateEnv } = require("./config/env");
+const connectDB = require("./config/db");
 
 async function startServer() {
   try {
-    if (!process.env.MONGO_URI || !process.env.JWT_SECRET) {
-      throw new Error("MONGO_URI or JWT_SECRET is missing in .env");
-    }
+    validateEnv();
+    await connectDB();
 
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("MongoDB connected successfully");
+    // Load the app after env validation so config is guaranteed to be present
+    const app = require("./app");
+    const PORT = process.env.PORT || 5000;
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });
+
+    // Graceful shutdown: stop accepting requests, then close the DB connection
+    const shutdown = (signal) => {
+      console.log(`${signal} received, shutting down...`);
+      server.close(async () => {
+        await mongoose.connection.close();
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(1), 10000).unref();
+    };
+
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
   } catch (error) {
     console.error("Server startup error:", error.message);
     process.exit(1);

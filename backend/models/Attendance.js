@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { isNotFuture } = require("../utils/dates");
 
 const attendanceSchema = new mongoose.Schema(
   {
@@ -13,26 +14,8 @@ const attendanceSchema = new mongoose.Schema(
       required: [true, "Attendance date is required"],
       validate: {
         validator: function (value) {
-          const today = new Date();
-
-          // Compare calendar dates in UTC
-          const inputDate = new Date(
-            Date.UTC(
-              value.getUTCFullYear(),
-              value.getUTCMonth(),
-              value.getUTCDate()
-            )
-          );
-
-          const todayDate = new Date(
-            Date.UTC(
-              today.getUTCFullYear(),
-              today.getUTCMonth(),
-              today.getUTCDate()
-            )
-          );
-
-          return inputDate <= todayDate;
+          // "Today" is evaluated in the academy's timezone (APP_TIMEZONE)
+          return isNotFuture(value);
         },
         message: "Attendance date cannot be in the future"
       }

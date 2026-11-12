@@ -27,6 +27,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Password is required"],
       minlength: [8, "Password must be at least 8 characters"],
+      maxlength: [72, "Password must be at most 72 characters"],
       select: false
     },
 
@@ -46,6 +47,12 @@ const userSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true
+    },
+
+    // Set when the password changes so older tokens can be rejected
+    passwordChangedAt: {
+      type: Date,
+      default: null
     }
   },
   {
@@ -58,6 +65,11 @@ userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
 
   this.password = await bcrypt.hash(this.password, 12);
+
+  // Not for brand-new users: only invalidate tokens on a real password change
+  if (!this.isNew) {
+    this.passwordChangedAt = new Date();
+  }
 });
 
 // Compare entered password with stored hash

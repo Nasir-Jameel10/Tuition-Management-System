@@ -1,44 +1,46 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+const unauthorized = (res, message) =>
+  res.status(401).json({ success: false, message });
+
 const protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required. Please log in."
-      });
+      return unauthorized(res, "Authentication required. Please log in.");
     }
 
     const token = authHeader.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "Token is missing"
-      });
+      return unauthorized(res, "Token is missing");
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Pin the algorithm so a forged token can't pick a weaker one.
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: ["HS256"]
+    });
 
     const user = await User.findById(decoded.id);
 
     if (!user || !user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: "User not found or account is disabled"
-      });
+      return unauthorized(res, "User not found or account is disabled");
+    }
+
+    // Tokens issued before the last password change are no longer valid.
+    if (
+      user.passwordChangedAt &&
+      decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)
+    ) {
+      return unauthorized(res, "Password was changed. Please log in again.");
     }
 
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({
-      success: false,
-      message: "Invalid or expired token"
-    });
+    return unauthorized(res, "Invalid or expired token");
   }
 };
 
