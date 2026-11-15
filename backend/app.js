@@ -25,6 +25,20 @@ const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173,http://
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: "1mb" }));
 
+// Vercel (serverless) par server.js nahi chalta, is liye har request se pehle DB connection yaqini banao
+if (process.env.VERCEL) {
+  const { connectOnce } = require("./config/db");
+  app.use(async (req, res, next) => {
+    try {
+      await connectOnce();
+      next();
+    } catch (err) {
+      console.error("DB connect error:", err.message);
+      next(err);
+    }
+  });
+}
+
 // Health check (not rate limited)
 app.get("/", (req, res) => {
   res.status(200).json({
