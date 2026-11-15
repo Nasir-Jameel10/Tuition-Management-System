@@ -148,6 +148,24 @@ export default function Users() {
     }
   };
 
+  const changeRole = async (u) => {
+    const next = u.role === "Admin" ? "Teacher" : "Admin";
+    const text =
+      next === "Admin"
+        ? `"${u.name}" ko Admin bana dein? Is ko poora access mil jayega (users banana, students delete karna, fees delete karna wagera).`
+        : `"${u.name}" ko Admin se Teacher bana dein?`;
+    if (!window.confirm(text)) return;
+    setError("");
+    setSuccess("");
+    try {
+      await api.patch(`/users/${u._id}`, { role: next });
+      setSuccess(`${u.name} ab ${next} hai`);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setError(err.response?.data?.message || "Role badla nahi ja saka");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -215,7 +233,12 @@ export default function Users() {
                         {u.isActive ? "Active" : "Pending / Disabled"}
                       </span>
                     </td>
-                    <td className="text-right">
+                    <td className="text-right space-x-2 whitespace-nowrap">
+                      {u._id !== myId && u.isActive && (
+                        <button className="btn-outline" onClick={() => changeRole(u)}>
+                          {u.role === "Admin" ? "Make Teacher" : "Make Admin"}
+                        </button>
+                      )}
                       {u._id !== myId && (
                         <button className="btn-outline" onClick={() => toggleActive(u)}>
                           {u.isActive ? "Disable" : "Approve"}
